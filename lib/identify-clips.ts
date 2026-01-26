@@ -12,6 +12,7 @@ export interface IdentifiedClip {
   reason: string;
   startTime: number;
   endTime: number;
+  hook: string;
   transcript: string;
 }
 
@@ -65,6 +66,9 @@ export async function identifyClips(
             reason: z.string().describe("Why this clip matches the criteria"),
             startTime: z.number().describe("Start time in seconds - must match a segment start time"),
             endTime: z.number().describe("End time in seconds - must match a segment end time"),
+            hook: z
+              .string()
+              .describe("A short, punchy hook that summarizes the clip in a few words"),
           })
         ),
       }),
@@ -75,7 +79,9 @@ USER REQUEST: ${prompt}
 
 CONSTRAINTS:
 - Identify exactly ${clipCount} clips
-- Each clip should be approximately ${clipDuration} seconds long
+- Aim for roughly ${clipDuration} seconds
+- Each clip must be between ${Math.max(1, Math.round(clipDuration * 0.75))} and ${Math.max(2, Math.round(clipDuration * 1.5))} seconds
+- Do not cut off mid-sentence; adjust to natural breaks within the allowed range
 - Clips should not overlap
 - Return clips in chronological order
 - CRITICAL: startTime and endTime MUST be exact values from the timestamps shown below (e.g., if a segment shows [12.5s - 15.2s], use 12.5 and 15.2)

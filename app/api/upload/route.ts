@@ -59,7 +59,9 @@ export async function POST(request: NextRequest) {
         startTime: clip.startTime,
         endTime: clip.endTime,
         title: clip.title,
+        hook: clip.hook,
         transcript: clip.transcript,
+        segments: transcription.segments,
       })),
       file.name
     );

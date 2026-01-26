@@ -29,7 +29,7 @@ export default function Home() {
   const [transcript, setTranscript] = useState<string | null>(null);
   const [clips, setClips] = useState<Clip[]>([]);
   const [prompt, setPrompt] = useState("Find the most engaging and viral-worthy moments");
-  const [clipCount, setClipCount] = useState(5);
+  const [clipCount, setClipCount] = useState(3);
   const [clipDuration, setClipDuration] = useState(12);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
