@@ -265,6 +265,7 @@ export async function generateVideoClips(
       const outputPath = path.join(tempDir, `clip-${sessionId}-${i}.mp4`);
 
       try {
+        console.log(`Clipping video ${i + 1} started`);
         // Extract, crop to 9:16, and add captions
         await extractClipWithCaptions(
           videoPath,
@@ -275,6 +276,7 @@ export async function generateVideoClips(
           clip.segments,
           clip.hook
         );
+        console.log(`Clipping video ${i + 1} completed`);
 
         // Read clip and convert to base64
         const clipBuffer = await fs.readFile(outputPath);

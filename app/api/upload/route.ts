@@ -37,13 +37,15 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const videoBuffer = Buffer.from(arrayBuffer);
 
-    // Extract audio from video
+    console.log("Video to audio conversion started");
     const audioBuffer = await extractAudioFromBuffer(videoBuffer, file.name);
+    console.log("Video to audio conversion completed");
 
-    // Transcribe audio using Deepgram
+    console.log("Audio to transcription started");
     const transcription = await transcribeAudio(audioBuffer);
+    console.log("Audio to transcription completed");
 
-    // Identify clips based on user prompt
+    console.log(`Identifying "${prompt}" related moments started`);
     const clipResult = await identifyClips(
       transcription.transcript,
       transcription.segments,
@@ -51,6 +53,7 @@ export async function POST(request: NextRequest) {
       clipCount,
       clipDuration
     );
+    console.log(`Identifying "${prompt}" related moments completed`);
 
     // Generate video clips using ffmpeg (with burned-in captions)
     const generatedClips = await generateVideoClips(
