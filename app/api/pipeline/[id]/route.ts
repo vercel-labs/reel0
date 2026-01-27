@@ -28,6 +28,36 @@ export async function GET(
       });
     }
     const status = await response.json();
+
+    const clipStatusResult = await list({ prefix: `${id}/clips/status-` });
+    if (clipStatusResult.blobs.length && Array.isArray(status.clips)) {
+      const clipStatusUpdates = await Promise.all(
+        clipStatusResult.blobs.map(async (blob) => {
+          try {
+            const clipResponse = await fetch(`${blob.url}?t=${Date.now()}`, {
+              cache: "no-store",
+            });
+            if (!clipResponse.ok) return null;
+            return clipResponse.json();
+          } catch {
+            return null;
+          }
+        })
+      );
+
+      clipStatusUpdates.forEach((update) => {
+        if (!update || typeof update.index !== "number") return;
+        const clipIndex = update.index;
+        if (!status.clips[clipIndex]) return;
+        status.clips[clipIndex] = {
+          ...status.clips[clipIndex],
+          status: update.status ?? status.clips[clipIndex].status,
+          video: update.video ?? status.clips[clipIndex].video,
+          error: update.error ?? status.clips[clipIndex].error,
+        };
+      });
+    }
+
     return NextResponse.json(status);
   } catch {
     return NextResponse.json(

@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { transcribeAudio } from "@/lib/transcribe";
-import { identifyClips } from "@/lib/identify-clips";
 import { put } from "@vercel/blob";
-import { buildAssContentForClip } from "@/lib/captions";
-import { extractAudioInSandbox, generateClipInSandbox } from "@/lib/sandbox-ffmpeg";
+import { start } from "workflow/api";
+import { processVideoPipeline } from "@/workflows/video-pipeline";
 
 export const runtime = "nodejs";
 process.env.VERCEL_BLOB_USE_X_CONTENT_LENGTH = "1";
@@ -42,6 +40,8 @@ export async function POST(request: NextRequest) {
       providedPipelineId && providedPipelineId.trim().length > 0
         ? providedPipelineId.trim()
         : `pipeline-${Date.now()}`;
+
+    // Upload video to Blob first (before starting workflow)
     console.log("Uploading video to Blob started");
     const videoBlob = await put(
       `${pipelineId}/input/${file.name}`,
@@ -50,26 +50,8 @@ export async function POST(request: NextRequest) {
     );
     console.log("Uploading video to Blob completed");
 
-    type PipelineStatusClip = {
-      title: string;
-      reason: string;
-      startTime: number;
-      endTime: number;
-      transcript: string;
-      hook: string;
-      video: { url: string; mimeType: string } | null;
-      status: "pending" | "ready" | "failed";
-      error?: string;
-    };
-
-    const pipelineStatus: {
-      pipelineId: string;
-      createdAt: number;
-      clipCount: number;
-      videoTitle: string;
-      transcript: string;
-      clips: PipelineStatusClip[];
-    } = {
+    // Create initial status
+    const pipelineStatus = {
       pipelineId,
       createdAt: Date.now(),
       clipCount,
@@ -83,7 +65,7 @@ export async function POST(request: NextRequest) {
         transcript: "",
         hook: "",
         video: null,
-        status: "pending",
+        status: "pending" as const,
       })),
     };
 
@@ -100,152 +82,24 @@ export async function POST(request: NextRequest) {
     );
     console.log(`Status blob created: ${statusBlob.url}`);
 
-    console.log("Video to audio conversion started (sandbox)");
-    const audioBuffer = await extractAudioInSandbox(videoBlob.url);
-    console.log("Video to audio conversion completed");
-
-    console.log("Uploading audio to Blob started");
-    console.log(`Audio buffer size: ${audioBuffer.length} bytes`);
-    
-    if (!audioBuffer || audioBuffer.length === 0) {
-      throw new Error("Audio extraction failed - empty buffer");
-    }
-    
-    const audioBlob = await put(
-      `${pipelineId}/audio/${file.name}.mp3`,
-      Buffer.from(audioBuffer),
-      {
-        access: "public",
-        contentType: "audio/mpeg",
-      }
-    );
-    console.log("Uploading audio to Blob completed");
-
-    console.log("Audio to transcription started");
-    const transcription = await transcribeAudio(audioBuffer);
-    console.log("Audio to transcription completed");
-
-    pipelineStatus.transcript = transcription.transcript;
-    await put(
-      `${pipelineId}/status.json`,
-      Buffer.from(JSON.stringify(pipelineStatus)),
-      {
-        access: "public",
-        contentType: "application/json",
-        addRandomSuffix: false,
-        allowOverwrite: true,
-        onUploadProgress: () => {},
-      }
-    );
-
-    console.log(`Identifying "${prompt}" related moments started`);
-    const clipResult = await identifyClips(
-      transcription.transcript,
-      transcription.segments,
+    // Start the durable workflow (runs asynchronously)
+    console.log("Starting durable video processing workflow...");
+    await start(processVideoPipeline, [{
+      pipelineId,
+      videoUrl: videoBlob.url,
+      videoName: file.name,
       prompt,
       clipCount,
-      clipDuration
-    );
-    console.log(`Identifying "${prompt}" related moments completed`);
-
-    const clipRequests = clipResult.clips.map((clip) => ({
-      startTime: clip.startTime,
-      endTime: clip.endTime,
-      assBase64: Buffer.from(
-        buildAssContentForClip({
-          startTime: clip.startTime,
-          endTime: clip.endTime,
-          transcript: clip.transcript,
-          segments: transcription.segments,
-          hook: clip.hook,
-        })
-      ).toString("base64"),
-    }));
-
-    const initialClips = clipResult.clips.map((clip) => ({
-      title: clip.title,
-      reason: clip.reason,
-      startTime: clip.startTime,
-      endTime: clip.endTime,
-      transcript: clip.transcript,
-      hook: clip.hook,
-    }));
-
-    pipelineStatus.clips = initialClips.map((clip) => ({
-      ...clip,
-      video: null,
-      status: "pending" as const,
-    }));
-
-    await put(
-      `${pipelineId}/status.json`,
-      Buffer.from(JSON.stringify(pipelineStatus)),
-      {
-        access: "public",
-        contentType: "application/json",
-        addRandomSuffix: false,
-        allowOverwrite: true,
-        onUploadProgress: () => {},
-      }
-    );
-
-    console.log("Video clipping started (sandbox)");
-    void Promise.allSettled(
-      clipRequests.map(async (clipRequest, index) => {
-        try {
-          const buffer = await generateClipInSandbox(videoBlob.url, clipRequest, index);
-          console.log(`Clip ${index + 1} buffer size: ${buffer.length} bytes`);
-          const upload = await put(
-            `${pipelineId}/clips/clip-${index + 1}.mp4`,
-            Buffer.from(buffer),
-            {
-              access: "public",
-              contentType: "video/mp4",
-            }
-          );
-          pipelineStatus.clips[index] = {
-            ...pipelineStatus.clips[index],
-            status: "ready",
-            video: { url: upload.url, mimeType: "video/mp4" },
-          };
-        } catch (error) {
-          pipelineStatus.clips[index] = {
-            ...pipelineStatus.clips[index],
-            status: "failed",
-            error: error instanceof Error ? error.message : "Clip generation failed",
-          };
-        }
-
-        await put(
-          `${pipelineId}/status.json`,
-          Buffer.from(JSON.stringify(pipelineStatus)),
-          {
-            access: "public",
-            contentType: "application/json",
-            addRandomSuffix: false,
-            allowOverwrite: true,
-            onUploadProgress: () => {},
-          }
-        );
-      })
-    );
-    console.log("Video clipping queued (sandbox)");
-
-    const clipsWithVideo = pipelineStatus.clips.map((clip) => ({
-      ...clip,
-    }));
+      clipDuration,
+    }]);
+    console.log("Workflow started successfully");
 
     return NextResponse.json({
       success: true,
-      filename: file.name,
-      transcript: transcription.transcript,
-      durationInSeconds: transcription.durationInSeconds,
-      segments: transcription.segments,
-      audioUrl: audioBlob.url,
-      videoUrl: videoBlob.url,
       pipelineId,
+      videoUrl: videoBlob.url,
       statusUrl: statusBlob.url,
-      clips: clipsWithVideo,
+      message: "Video processing workflow started",
     });
   } catch (error) {
     console.error("Upload error:", error);
