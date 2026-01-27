@@ -4,11 +4,7 @@ import { useState, useRef, DragEvent, ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 
 interface VideoData {
-  title: string;
-  startTime: number;
-  endTime: number;
-  duration: number;
-  data: string;
+  url: string;
   mimeType: string;
 }
 
@@ -113,24 +109,14 @@ export default function Home() {
   };
 
   const downloadClip = (clip: Clip) => {
-    if (!clip.video?.data) return;
-    
-    const byteCharacters = atob(clip.video.data);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
-    }
-    const byteArray = new Uint8Array(byteNumbers);
-    const blob = new Blob([byteArray], { type: clip.video.mimeType });
-    
-    const url = URL.createObjectURL(blob);
+    if (!clip.video?.url) return;
+
     const a = document.createElement("a");
-    a.href = url;
+    a.href = clip.video.url;
     a.download = `${clip.title.replace(/[^a-z0-9]/gi, "_")}.mp4`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
   };
 
   return (
@@ -270,12 +256,12 @@ export default function Home() {
                   </span>
                 </div>
                 
-                {clip.video?.data && (
+                {clip.video?.url && (
                   <div className="space-y-2">
                     <video
                       controls
                       className="w-full rounded-lg"
-                      src={`data:${clip.video.mimeType};base64,${clip.video.data}`}
+                      src={clip.video.url}
                     >
                       Your browser does not support the video tag.
                     </video>
