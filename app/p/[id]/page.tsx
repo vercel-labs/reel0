@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -25,9 +25,15 @@ interface Clip {
 export default function PipelinePage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [clips, setClips] = useState<Clip[]>([]);
+  const [videoTitle, setVideoTitle] = useState<string | null>(null);
+  const [clipCount, setClipCount] = useState<number | null>(null);
   const pollIntervalRef = useRef<number | null>(null);
-  const skeletonCount = 3;
+  
+  // Use clipCount from status.json if available, else fall back to query param
+  const initialCount = parseInt(searchParams.get("count") || "3", 10) || 3;
+  const skeletonCount = Math.max(1, Math.min(20, clipCount ?? initialCount));
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -51,21 +57,30 @@ export default function PipelinePage() {
     if (!pipelineId) return;
 
     const fetchStatus = async () => {
-      const res = await fetch(`/api/pipeline/${pipelineId}?t=${Date.now()}`);
-      if (!res.ok) return;
-      const status = await res.json();
-      setClips(status.clips || []);
-      const allDone = (status.clips || []).every(
-        (clip: Clip) => clip.status === "ready" || clip.status === "failed"
-      );
-      if (allDone && pollIntervalRef.current) {
-        window.clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
+      try {
+        const res = await fetch(`/api/pipeline/${pipelineId}?t=${Date.now()}`);
+        if (!res.ok) return;
+        const status = await res.json();
+        setClips(status.clips || []);
+        setVideoTitle(status.videoTitle || null);
+        if (status.clipCount) setClipCount(status.clipCount);
+        
+        // Only stop polling if we have clips AND all are done
+        const clipsArray = status.clips || [];
+        const allDone = clipsArray.length > 0 && clipsArray.every(
+          (clip: Clip) => clip.status === "ready" || clip.status === "failed"
+        );
+        if (allDone && pollIntervalRef.current) {
+          window.clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+      } catch {
+        // Continue polling on error
       }
     };
 
     fetchStatus();
-    pollIntervalRef.current = window.setInterval(fetchStatus, 3000);
+    pollIntervalRef.current = window.setInterval(fetchStatus, 2000);
 
     return () => {
       if (pollIntervalRef.current) {
@@ -102,6 +117,10 @@ export default function PipelinePage() {
           </Button>
           <h1 className="text-center text-4xl font-bold">Video Clip Finder</h1>
         </div>
+
+        {videoTitle && (
+          <p className="text-sm text-muted-foreground">Video: {videoTitle}</p>
+        )}
 
         <div className="w-full space-y-4">
           <div className="flex flex-wrap gap-6">
@@ -152,14 +171,11 @@ export default function PipelinePage() {
                     </div>
                   )}
 
-                  <div className="mt-4 min-h-[56px]">
-                    {clip.status === "failed" && (
-                      <p className="text-sm text-red-600">
-                        Failed to generate clip{clip.error ? `: ${clip.error}` : ""}
-                      </p>
-                    )}
-                    <p className="text-sm text-muted-foreground">{clip.reason}</p>
-                  </div>
+                  {clip.status === "failed" && (
+                    <p className="mt-4 text-sm text-red-600">
+                      Failed to generate clip{clip.error ? `: ${clip.error}` : ""}
+                    </p>
+                  )}
               </div>
             ))}
           </div>

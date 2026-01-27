@@ -65,10 +65,16 @@ export async function POST(request: NextRequest) {
     const pipelineStatus: {
       pipelineId: string;
       createdAt: number;
+      clipCount: number;
+      videoTitle: string;
+      transcript: string;
       clips: PipelineStatusClip[];
     } = {
       pipelineId,
       createdAt: Date.now(),
+      clipCount,
+      videoTitle: file.name,
+      transcript: "",
       clips: Array.from({ length: clipCount }, (_, index) => ({
         title: `Clip ${index + 1}`,
         reason: "Generating clip...",
@@ -83,14 +89,16 @@ export async function POST(request: NextRequest) {
 
     const statusBlob = await put(
       `${pipelineId}/status.json`,
-      JSON.stringify(pipelineStatus),
+      Buffer.from(JSON.stringify(pipelineStatus)),
       {
         access: "public",
         contentType: "application/json",
         addRandomSuffix: false,
         allowOverwrite: true,
+        onUploadProgress: () => {},
       }
     );
+    console.log(`Status blob created: ${statusBlob.url}`);
 
     console.log("Video to audio conversion started (sandbox)");
     const audioBuffer = await extractAudioInSandbox(videoBlob.url);
@@ -116,6 +124,19 @@ export async function POST(request: NextRequest) {
     console.log("Audio to transcription started");
     const transcription = await transcribeAudio(audioBuffer);
     console.log("Audio to transcription completed");
+
+    pipelineStatus.transcript = transcription.transcript;
+    await put(
+      `${pipelineId}/status.json`,
+      Buffer.from(JSON.stringify(pipelineStatus)),
+      {
+        access: "public",
+        contentType: "application/json",
+        addRandomSuffix: false,
+        allowOverwrite: true,
+        onUploadProgress: () => {},
+      }
+    );
 
     console.log(`Identifying "${prompt}" related moments started`);
     const clipResult = await identifyClips(
@@ -158,12 +179,13 @@ export async function POST(request: NextRequest) {
 
     await put(
       `${pipelineId}/status.json`,
-      JSON.stringify(pipelineStatus),
+      Buffer.from(JSON.stringify(pipelineStatus)),
       {
         access: "public",
         contentType: "application/json",
         addRandomSuffix: false,
         allowOverwrite: true,
+        onUploadProgress: () => {},
       }
     );
 
@@ -196,12 +218,13 @@ export async function POST(request: NextRequest) {
 
         await put(
           `${pipelineId}/status.json`,
-          JSON.stringify(pipelineStatus),
+          Buffer.from(JSON.stringify(pipelineStatus)),
           {
             access: "public",
             contentType: "application/json",
             addRandomSuffix: false,
             allowOverwrite: true,
+            onUploadProgress: () => {},
           }
         );
       })

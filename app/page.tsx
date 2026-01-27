@@ -69,7 +69,7 @@ export default function Home() {
     if (!selectedFile) return;
 
     const pipelineId = `pipeline-${Date.now()}`;
-    router.push(`/p/${pipelineId}`);
+    router.push(`/p/${pipelineId}?count=${clipCount}`);
 
     setIsUploading(true);
     setUploadStatus(null);

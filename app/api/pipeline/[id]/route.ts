@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { head, BlobNotFoundError } from "@vercel/blob";
+import { list } from "@vercel/blob";
 
 export const runtime = "nodejs";
 
@@ -9,17 +9,27 @@ export async function GET(
 ) {
   const { id } = await params;
   try {
-    const result = await head(`${id}/status.json`);
-    const response = await fetch(result.url, { cache: "no-store" });
+    const result = await list({ prefix: `${id}/status.json`, limit: 1 });
+    if (!result.blobs.length) {
+      return NextResponse.json({
+        pipelineId: id,
+        createdAt: Date.now(),
+        clips: [],
+      });
+    }
+    const response = await fetch(`${result.blobs[0].url}?t=${Date.now()}`, {
+      cache: "no-store",
+    });
     if (!response.ok) {
-      return NextResponse.json({ error: "Pipeline not found" }, { status: 404 });
+      return NextResponse.json({
+        pipelineId: id,
+        createdAt: Date.now(),
+        clips: [],
+      });
     }
     const status = await response.json();
     return NextResponse.json(status);
-  } catch (error) {
-    if (error instanceof BlobNotFoundError) {
-      return NextResponse.json({ error: "Pipeline not found" }, { status: 404 });
-    }
+  } catch {
     return NextResponse.json(
       { error: "Failed to fetch pipeline status" },
       { status: 500 }
