@@ -1,6 +1,4 @@
 import ffmpeg from "fluent-ffmpeg";
-import "@/lib/ffmpeg-config";
-import { getFfmpegPath } from "@/lib/ffmpeg-config";
 import { promises as fs } from "fs";
 import path from "path";
 import os from "os";
@@ -35,7 +33,7 @@ function isSubtitlesAvailable(): Promise<boolean> {
   if (!subtitlesAvailablePromise) {
     subtitlesAvailablePromise = (async () => {
       const execFileAsync = promisify(execFile);
-      const ffmpegPath = getFfmpegPath() ?? "ffmpeg";
+      const ffmpegPath = "ffmpeg";
       try {
         const { stdout } = await execFileAsync(ffmpegPath, ["-filters"]);
         return /\bsubtitles\b/.test(stdout);

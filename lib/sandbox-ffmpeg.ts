@@ -183,3 +183,60 @@ export async function generateClipsInSandbox(
     await sandbox.stop().catch(() => {});
   }
 }
+
+export async function generateClipInSandbox(
+  videoUrl: string,
+  clip: SandboxClipRequest,
+  clipIndex: number
+): Promise<Buffer> {
+  console.log(`[Sandbox] Creating sandbox for clip ${clipIndex + 1}...`);
+  const sandbox = await Sandbox.create(getSandboxConfig());
+  console.log(`[Sandbox] Sandbox created: ${sandbox.sandboxId}`);
+
+  try {
+    await ensureFfmpegInstalled(sandbox);
+    await downloadVideo(sandbox, videoUrl);
+
+    const duration = clip.endTime - clip.startTime;
+    const assPath = `/tmp/clip-${clipIndex}.ass`;
+    const outPath = `/tmp/out-${clipIndex}.mp4`;
+
+    await runAndCheck(
+      sandbox,
+      ["-lc", `echo '${clip.assBase64}' | base64 -d > ${assPath}`],
+      `Write ASS file for clip ${clipIndex + 1}`
+    );
+
+    const ffmpegCmd = [
+      "/usr/local/bin/ffmpeg -y",
+      `-ss ${clip.startTime}`,
+      `-t ${duration}`,
+      "-i /tmp/input.mp4",
+      `-vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,subtitles=${assPath}:original_size=1080x1920:fontsdir=/usr/share/fonts"`,
+      "-c:v libx264",
+      "-c:a aac",
+      "-movflags +faststart",
+      "-preset fast",
+      outPath,
+    ].join(" ");
+
+    await runAndCheck(
+      sandbox,
+      ["-lc", `${ffmpegCmd} && ls -la ${outPath}`],
+      `Generate clip ${clipIndex + 1}`
+    );
+
+    const clipBase64 = await runAndCheck(
+      sandbox,
+      ["-lc", `base64 -w 0 ${outPath}`],
+      `Encode clip ${clipIndex + 1} to base64`
+    );
+
+    const buffer = Buffer.from(clipBase64.trim(), "base64");
+    console.log(`[Sandbox] Clip ${clipIndex + 1} buffer size: ${buffer.length} bytes`);
+    return buffer;
+  } finally {
+    console.log(`[Sandbox] Stopping sandbox for clip ${clipIndex + 1}...`);
+    await sandbox.stop().catch(() => {});
+  }
+}

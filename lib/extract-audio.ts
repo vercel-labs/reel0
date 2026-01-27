@@ -1,5 +1,4 @@
 import ffmpeg from "fluent-ffmpeg";
-import "@/lib/ffmpeg-config";
 import { promises as fs } from "fs";
 import path from "path";
 import os from "os";
