@@ -9,19 +9,21 @@ process.env.VERCEL_BLOB_USE_X_CONTENT_LENGTH = "1";
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
-    const file = formData.get("video") as File;
+    const file = formData.get("video") as File | null;
+    const videoUrl = formData.get("videoUrl") as string | null;
+    const videoName = formData.get("videoName") as string | null;
     const prompt = formData.get("prompt") as string;
     const clipCount = parseInt(formData.get("clipCount") as string) || 5;
     const clipDuration = parseInt(formData.get("clipDuration") as string) || 12;
 
-    if (!file) {
+    if (!file && !videoUrl) {
       return NextResponse.json(
         { error: "No video file provided" },
         { status: 400 }
       );
     }
 
-    if (!file.type.startsWith("video/")) {
+    if (file && !file.type.startsWith("video/")) {
       return NextResponse.json(
         { error: "File must be a video" },
         { status: 400 }
@@ -42,20 +44,22 @@ export async function POST(request: NextRequest) {
         : `pipeline-${Date.now()}`;
 
     // Upload video to Blob first (before starting workflow)
-    console.log("Uploading video to Blob started");
-    const videoBlob = await put(
-      `${pipelineId}/input/${file.name}`,
-      file,
-      { access: "public", contentType: file.type }
-    );
-    console.log("Uploading video to Blob completed");
+    if (!videoUrl) {
+      return NextResponse.json(
+        { error: "Missing videoUrl from Blob upload" },
+        { status: 400 }
+      );
+    }
+
+    const resolvedVideoName =
+      videoName?.trim() || file?.name || "uploaded-video.mp4";
 
     // Create initial status
     const pipelineStatus = {
       pipelineId,
       createdAt: Date.now(),
       clipCount,
-      videoTitle: file.name,
+      videoTitle: resolvedVideoName,
       transcript: "",
       clips: Array.from({ length: clipCount }, (_, index) => ({
         title: `Clip ${index + 1}`,
@@ -86,8 +90,8 @@ export async function POST(request: NextRequest) {
     console.log("Starting durable video processing workflow...");
     await start(processVideoPipeline, [{
       pipelineId,
-      videoUrl: videoBlob.url,
-      videoName: file.name,
+      videoUrl,
+      videoName: resolvedVideoName,
       prompt,
       clipCount,
       clipDuration,
@@ -97,7 +101,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       pipelineId,
-      videoUrl: videoBlob.url,
+      videoUrl,
       statusUrl: statusBlob.url,
       message: "Video processing workflow started",
     });

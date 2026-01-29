@@ -4,6 +4,7 @@ import { useState, useRef, DragEvent, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { upload } from "@vercel/blob/client";
 
 interface VideoData {
   url: string;
@@ -86,8 +87,18 @@ export default function Home() {
     );
 
     try {
+      const uploadResult = await upload(
+        `${pipelineId}/input/${selectedFile.name}`,
+        selectedFile,
+        {
+          access: "public",
+          handleUploadUrl: "/api/blob",
+        }
+      );
+
       const formData = new FormData();
-      formData.append("video", selectedFile);
+      formData.append("videoUrl", uploadResult.url);
+      formData.append("videoName", selectedFile.name);
       formData.append("prompt", prompt);
       formData.append("clipCount", clipCount.toString());
       formData.append("clipDuration", clipDuration.toString());
