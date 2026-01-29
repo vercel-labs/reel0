@@ -16,6 +16,7 @@
     "@types/fluent-ffmpeg": "^2.1.28",
     "@vercel/blob": "^2.0.1",
     "@vercel/sandbox": "^1.0.0",
+    "@workflow/next": "4.0.1-beta.46",
     "ai": "^6.0.50",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
