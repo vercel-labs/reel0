@@ -29,6 +29,29 @@ export async function GET(
     }
     const status = await response.json();
 
+    const clipCount =
+      typeof status.clipCount === "number" && status.clipCount > 0
+        ? status.clipCount
+        : 0;
+
+    if (!Array.isArray(status.clips)) {
+      status.clips = [];
+    }
+
+    if (clipCount && status.clips.length < clipCount) {
+      const placeholders = Array.from({ length: clipCount - status.clips.length }, (_, i) => ({
+        title: `Clip ${status.clips.length + i + 1}`,
+        reason: "Generating clip...",
+        startTime: 0,
+        endTime: 0,
+        transcript: "",
+        hook: "",
+        video: null,
+        status: "pending",
+      }));
+      status.clips = [...status.clips, ...placeholders];
+    }
+
     const clipStatusResult = await list({ prefix: `${id}/clips/status-` });
     if (clipStatusResult.blobs.length && Array.isArray(status.clips)) {
       const clipStatusUpdates = await Promise.all(
