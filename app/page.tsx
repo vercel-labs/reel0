@@ -187,7 +187,7 @@ export default function Home() {
               }}
               className="bg-gradient-to-br from-foreground to-muted-foreground bg-clip-text text-center text-4xl font-bold tracking-tight text-transparent md:text-5xl"
             >
-              Make viral clips faster
+              You can just clip things
             </motion.h1>
           </LampHeader>
         )}
