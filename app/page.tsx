@@ -2,8 +2,22 @@
 
 import { useState, useRef, DragEvent, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
+import { mutate } from "swr";
+import { motion } from "framer-motion";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { LampHeader } from "@/components/ui/lamp";
+import { FlickeringGrid } from "@/components/ui/flickering-grid";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ThemeSwitcher } from "@/components/theme-switcher";
+import { Sidebar } from "@/components/sidebar";
 import { upload } from "@vercel/blob/client";
 
 interface VideoData {
@@ -116,6 +130,12 @@ export default function Home() {
       }
       setClips(data.clips || []);
       setSelectedFile(null);
+      // Revalidate the sidebar to show the new pipeline (match all paginated keys)
+      mutate(
+        (key) => typeof key === "string" && key.startsWith("/api/pipelines"),
+        undefined,
+        { revalidate: true }
+      );
     } catch (error) {
       setUploadStatus(
         error instanceof Error ? error.message : "Upload failed"
@@ -150,34 +170,80 @@ export default function Home() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <main className="flex w-full max-w-6xl flex-col items-center gap-6">
-        <div className="relative w-full">
-          {clips.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={resetToHome}
-              className="absolute left-0 top-1/2 -translate-y-1/2"
-            >
-              Home
-            </Button>
-          )}
-          <h1 className="text-center text-4xl font-bold">Video Clip Finder</h1>
+    <div className="flex min-h-screen">
+      <Sidebar />
+      <div className="relative flex flex-1 flex-col items-center p-4">
+        <div className="absolute right-4 top-4 z-50">
+          <ThemeSwitcher />
         </div>
+        
+        {/* Lamp at the top */}
+        {!isUploading && clips.length === 0 && (
+          <LampHeader className="mt-8">
+            <motion.h1
+              initial={{ opacity: 0, y: "35vh", scale: 1.8 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{
+                delay: 0.3,
+                duration: 1.8,
+                ease: [0.25, 0.1, 0.25, 1],
+              }}
+              className="bg-gradient-to-br from-foreground to-muted-foreground bg-clip-text text-center text-4xl font-bold tracking-tight text-transparent md:text-5xl"
+            >
+              Make viral clips faster
+            </motion.h1>
+          </LampHeader>
+        )}
+
+        {/* Main content */}
+        <main className="relative z-10 flex w-full max-w-6xl flex-col items-center gap-6">
+        {(isUploading || clips.length > 0) && (
+          <div className="relative w-full">
+            {clips.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={resetToHome}
+                className="absolute left-0 top-1/2 -translate-y-1/2"
+              >
+                Home
+              </Button>
+            )}
+            <h1 className="text-center text-4xl font-bold">Make viral clips faster</h1>
+          </div>
+        )}
 
         {!isUploading && clips.length === 0 && (
-          <div
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ 
+              opacity: 1, 
+              y: 0,
+              marginTop: 120,
+            }}
+            transition={{
+              delay: selectedFile ? 0 : 2.2,
+              duration: selectedFile ? 0.5 : 0.6,
+              ease: "easeOut",
+            }}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             onClick={handleClick}
-            className={`w-full rounded-lg border-2 border-dashed p-12 text-center transition-colors cursor-pointer ${
+            className={`relative w-full rounded-lg border-2 border-dashed p-12 text-center cursor-pointer overflow-hidden ${
               isDragging
                 ? "border-primary bg-primary/5"
-                : "border-muted-foreground/25 hover:border-primary/50"
+                : "border-muted-foreground/15 hover:border-primary/30"
             }`}
           >
+            <FlickeringGrid
+              className="absolute inset-0 z-0"
+              squareSize={4}
+              gridGap={6}
+              color="#6B7280"
+              maxOpacity={0.3}
+              flickerChance={0.1}
+            />
             <input
               ref={fileInputRef}
               type="file"
@@ -187,91 +253,117 @@ export default function Home() {
             />
             
             {selectedFile ? (
-              <div className="flex flex-col items-center gap-2">
-                <p className="text-lg font-medium">{selectedFile.name}</p>
-                <p className="text-sm text-muted-foreground">
-                  {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
-                </p>
-              </div>
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedFile(null);
+                    setUploadStatus(null);
+                    setClips([]);
+                    if (fileInputRef.current) {
+                      fileInputRef.current.value = "";
+                    }
+                  }}
+                  className="absolute left-3 top-3 z-20 rounded-full p-1.5 hover:bg-muted transition-colors"
+                  aria-label="Remove file"
+                >
+                  <X className="size-5 text-muted-foreground" />
+                </button>
+                <div className="relative z-10 flex flex-col items-center gap-3">
+                  <p className="text-2xl font-semibold">{selectedFile.name}</p>
+                  <p className="text-base text-muted-foreground">
+                    {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
+                  </p>
+                </div>
+              </>
             ) : (
-              <div className="flex flex-col items-center gap-4">
+              <div className="relative z-10 flex flex-col items-center gap-4">
                 <p className="text-lg font-medium">
-                  Drag and drop a video file here
+                  Drop a long video to get started
                 </p>
                 <p className="text-sm text-muted-foreground">or click to browse</p>
               </div>
             )}
-          </div>
+          </motion.div>
         )}
 
         {selectedFile && !isUploading && (
-          <div className="w-full space-y-4">
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: 0.4,
+              ease: "easeOut",
+            }}
+            className="w-full space-y-6"
+          >
             <div>
-              <label className="mb-2 block text-sm font-medium">
+              <label className="mb-3 block text-lg font-medium">
                 What clips are you looking for?
               </label>
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                className="w-full rounded-lg border bg-background p-3 text-sm"
+                className="w-full rounded-lg border bg-background p-4 text-lg"
                 rows={2}
+                maxLength={60}
                 placeholder="e.g., Find the most engaging and viral-worthy moments"
               />
             </div>
 
-            <div className="flex gap-4">
+            <div className="flex gap-6">
               <div className="flex-1">
-                <label className="mb-2 block text-sm font-medium">
+                <label className="mb-3 block text-lg font-medium">
                   Number of clips
                 </label>
-                <input
-                  type="number"
-                  value={clipCount}
-                  onChange={(e) => setClipCount(parseInt(e.target.value) || 1)}
-                  min={1}
-                  max={20}
-                  className="w-full rounded-lg border bg-background p-3 text-sm"
-                />
+                <Select
+                  value={clipCount.toString()}
+                  onValueChange={(value) => setClipCount(parseInt(value))}
+                >
+                  <SelectTrigger className="w-full h-14 text-lg">
+                    <SelectValue placeholder="Select clips" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 15 }, (_, i) => i + 1).map((num) => (
+                      <SelectItem key={num} value={num.toString()} className="text-lg">
+                        {num}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="flex-1">
-                <label className="mb-2 block text-sm font-medium">
+                <label className="mb-3 block text-lg font-medium">
                   Clip duration (seconds)
                 </label>
-                <input
-                  type="number"
-                  value={clipDuration}
-                  onChange={(e) => setClipDuration(parseInt(e.target.value) || 1)}
-                  min={5}
-                  max={120}
-                  className="w-full rounded-lg border bg-background p-3 text-sm"
-                />
+                <Select
+                  value={clipDuration.toString()}
+                  onValueChange={(value) => setClipDuration(parseInt(value))}
+                >
+                  <SelectTrigger className="w-full h-14 text-lg">
+                    <SelectValue placeholder="Select duration" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10" className="text-lg">10</SelectItem>
+                    <SelectItem value="12" className="text-lg">12</SelectItem>
+                    <SelectItem value="15" className="text-lg">15</SelectItem>
+                    <SelectItem value="18" className="text-lg">18</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            <div className="flex gap-2">
-              <Button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleUpload();
-                }}
-                disabled={isUploading || !prompt.trim()}
-                className="flex-1"
-              >
-                {isUploading ? "Processing..." : "Find Clips"}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSelectedFile(null);
-                  setUploadStatus(null);
-                  setClips([]);
-                }}
-                disabled={isUploading}
-              >
-                Remove
-              </Button>
-            </div>
-          </div>
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleUpload();
+              }}
+              disabled={isUploading || !prompt.trim()}
+              className="w-full text-lg py-6"
+            >
+              {isUploading ? "Processing..." : "Find Clips"}
+            </Button>
+          </motion.div>
         )}
 
         {clips.length > 0 && (
@@ -326,7 +418,8 @@ export default function Home() {
             </div>
           </div>
         )}
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

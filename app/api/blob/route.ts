@@ -1,9 +1,12 @@
-import { handleUpload } from "@vercel/blob";
+import { handleUpload } from "@vercel/blob/client";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  return handleUpload(request, {
+  const body = await request.json();
+  const result = await handleUpload({
+    request,
+    body,
     onBeforeGenerateToken: async () => {
       return {
         allowedContentTypes: ["video/*"],
@@ -13,4 +16,6 @@ export async function POST(request: Request) {
       };
     },
   });
+
+  return Response.json(result);
 }

@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Sidebar } from "@/components/sidebar";
+import { ThemeSwitcher } from "@/components/theme-switcher";
 
 interface VideoData {
   url: string;
@@ -24,7 +26,6 @@ interface Clip {
 
 export default function PipelinePage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [clips, setClips] = useState<Clip[]>([]);
   const [videoTitle, setVideoTitle] = useState<string | null>(null);
@@ -104,23 +105,20 @@ export default function PipelinePage() {
         }));
 
   return (
-    <div className="flex min-h-screen items-start justify-center p-4 pt-8">
-      <main className="flex w-full max-w-6xl flex-col items-center gap-6">
-        <div className="relative w-full">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => router.push("/")}
-            className="absolute left-0 top-1/2 -translate-y-1/2"
-          >
-            Home
-          </Button>
-          <h1 className="text-center text-4xl font-bold">Video Clip Finder</h1>
+    <div className="flex min-h-screen">
+      <Sidebar />
+      <div className="relative flex flex-1 items-start justify-center p-4 pt-8">
+        <div className="absolute right-4 top-4">
+          <ThemeSwitcher />
         </div>
+        <main className="flex w-full max-w-6xl flex-col items-center gap-6">
+          <div className="w-full">
+            <h1 className="text-center text-4xl font-bold">Make viral clips faster</h1>
+          </div>
 
-        {videoTitle && (
-          <p className="text-sm text-muted-foreground">Video: {videoTitle}</p>
-        )}
+          {videoTitle && (
+            <p className="text-sm text-muted-foreground">Video: {videoTitle}</p>
+          )}
 
         <div className="w-full space-y-4">
           <div className="flex flex-wrap gap-6">
@@ -180,7 +178,8 @@ export default function PipelinePage() {
             ))}
           </div>
         </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
