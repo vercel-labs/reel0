@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     );
 
     // Fetch each status file to get pipeline details
-    const pipelines: PipelineSummary[] = await Promise.all(
+    const pipelines: (PipelineSummary | null)[] = await Promise.all(
       statusBlobs.map(async (blob) => {
         try {
           const response = await fetch(`${blob.url}?t=${Date.now()}`, {
