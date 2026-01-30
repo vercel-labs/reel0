@@ -4,10 +4,6 @@
 
 <h3 align="center">You can just clip things</h3>
 
-<p align="center">
-  <a href="https://reel0.labs.vercel.dev/" target="_blank">Live Demo</a>
-</p>
-
 ---
 
 Reel0 is an AI-powered video processing tool that automatically identifies and extracts the most engaging clips from long-form videos. Upload a video, and Reel0 will analyze the content to find viral-worthy moments.
