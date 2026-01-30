@@ -2,7 +2,7 @@
   <img src="public/dark-logo.png" alt="Reel0" width="120" />
 </p>
 
-<h3 align="center">Make viral videos faster</h3>
+<h3 align="center">You can just clip things</h3>
 
 <p align="center">
   <a href="https://reel0.labs.vercel.dev/" target="_blank">Live Demo</a>
