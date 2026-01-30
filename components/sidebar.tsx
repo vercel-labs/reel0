@@ -2,14 +2,15 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { useTheme } from "next-themes";
 import useSWRInfinite from "swr/infinite";
 import {
   PanelLeftClose,
   PanelLeft,
   Video,
   Clock,
-  Film,
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -67,8 +68,15 @@ function SidebarItemSkeleton() {
 
 export function Sidebar() {
   const [isOpen, setIsOpen] = React.useState(false);
+  const [mounted, setMounted] = React.useState(false);
   const pathname = usePathname();
+  const { resolvedTheme } = useTheme();
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+
+  // Set mounted after hydration
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Close sidebar on smaller screens
   React.useEffect(() => {
@@ -85,13 +93,6 @@ export function Sidebar() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-
-  // Close sidebar when navigating on mobile
-  React.useEffect(() => {
-    if (window.innerWidth < 1024) {
-      setIsOpen(false);
-    }
-  }, [pathname]);
 
   const { data, isLoading, isValidating, size, setSize } =
     useSWRInfinite<PipelinesResponse>(getKey, fetcher, {
@@ -185,8 +186,17 @@ export function Sidebar() {
           {/* Header */}
           <div className="flex h-14 items-center justify-between border-b px-4">
             <div className="flex items-center gap-2">
-              <Film className="size-5 text-primary" />
-              <span className="font-semibold">Reel0</span>
+              {mounted ? (
+                <Image
+                  src={resolvedTheme === "dark" ? "/dark-logo.png" : "/light-logo.png"}
+                  alt="Reel0"
+                  width={80}
+                  height={24}
+                  className="h-6 w-auto"
+                />
+              ) : (
+                <div className="h-6 w-20" />
+              )}
             </div>
             <Button
               variant="ghost"
@@ -265,7 +275,7 @@ export function Sidebar() {
                           {formatDate(pipeline.createdAt)}
                         </span>
                         <span className="flex items-center gap-1">
-                          <Film className="size-3" />
+                          <Video className="size-3" />
                           {pipeline.readyClips}/{pipeline.clipCount} clips
                         </span>
                       </div>

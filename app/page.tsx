@@ -17,7 +17,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ThemeSwitcher } from "@/components/theme-switcher";
-import { Sidebar } from "@/components/sidebar";
 import { upload } from "@vercel/blob/client";
 
 interface VideoData {
@@ -170,9 +169,7 @@ export default function Home() {
   };
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <div className="relative flex flex-1 flex-col items-center p-4">
+    <div className="relative flex flex-1 flex-col items-center p-4">
         <div className="absolute right-4 top-4 z-50">
           <ThemeSwitcher />
         </div>
@@ -324,7 +321,7 @@ export default function Home() {
                     <SelectValue placeholder="Select clips" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.from({ length: 15 }, (_, i) => i + 1).map((num) => (
+                    {[3, 6, 9].map((num) => (
                       <SelectItem key={num} value={num.toString()} className="text-lg">
                         {num}
                       </SelectItem>
@@ -419,7 +416,6 @@ export default function Home() {
           </div>
         )}
         </main>
-      </div>
     </div>
   );
 }

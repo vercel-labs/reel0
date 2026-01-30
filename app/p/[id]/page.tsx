@@ -3,9 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Sidebar } from "@/components/sidebar";
 import { ThemeSwitcher } from "@/components/theme-switcher";
+import { FlickeringGrid } from "@/components/ui/flickering-grid";
 
 interface VideoData {
   url: string;
@@ -28,7 +27,6 @@ export default function PipelinePage() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const [clips, setClips] = useState<Clip[]>([]);
-  const [videoTitle, setVideoTitle] = useState<string | null>(null);
   const [clipCount, setClipCount] = useState<number | null>(null);
   const pollIntervalRef = useRef<number | null>(null);
   
@@ -63,7 +61,6 @@ export default function PipelinePage() {
         if (!res.ok) return;
         const status = await res.json();
         setClips(status.clips || []);
-        setVideoTitle(status.videoTitle || null);
         if (status.clipCount) setClipCount(status.clipCount);
         
         // Only stop polling if we have clips AND all are done
@@ -105,21 +102,11 @@ export default function PipelinePage() {
         }));
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <div className="relative flex flex-1 items-start justify-center p-4 pt-8">
-        <div className="absolute right-4 top-4">
-          <ThemeSwitcher />
-        </div>
-        <main className="flex w-full max-w-6xl flex-col items-center gap-6">
-          <div className="w-full">
-            <h1 className="text-center text-4xl font-bold">Make viral clips faster</h1>
-          </div>
-
-          {videoTitle && (
-            <p className="text-sm text-muted-foreground">Video: {videoTitle}</p>
-          )}
-
+    <div className="relative flex flex-1 items-start justify-center p-4 pt-8">
+      <div className="absolute right-4 top-4">
+        <ThemeSwitcher />
+      </div>
+        <main className="flex w-full max-w-6xl flex-col items-center gap-6 pt-8">
         <div className="w-full space-y-4">
           <div className="flex flex-wrap gap-6">
             {displayClips.map((clip, index) => (
@@ -164,8 +151,16 @@ export default function PipelinePage() {
                   </div>
                   ) : (
                     <div className="mt-4 space-y-2">
-                      <Skeleton className="aspect-[9/16] w-full rounded-lg" />
-                      <Skeleton className="h-9 w-full" />
+                      <div className="relative aspect-[9/16] w-full rounded-lg overflow-hidden border border-muted-foreground/15">
+                        <FlickeringGrid
+                          className="absolute inset-0 z-0"
+                          squareSize={4}
+                          gridGap={6}
+                          color="#6B7280"
+                          maxOpacity={0.3}
+                          flickerChance={0.1}
+                        />
+                      </div>
                     </div>
                   )}
 
@@ -178,8 +173,7 @@ export default function PipelinePage() {
             ))}
           </div>
         </div>
-        </main>
-      </div>
+      </main>
     </div>
   );
 }
