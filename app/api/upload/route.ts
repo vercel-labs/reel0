@@ -1,20 +1,58 @@
 import { NextRequest, NextResponse } from "next/server";
-import { put } from "@vercel/blob";
+import { head, put } from "@vercel/blob";
 import { start } from "workflow/api";
 import { processVideoPipeline } from "@/workflows/video-pipeline";
 
 export const runtime = "nodejs";
 process.env.VERCEL_BLOB_USE_X_CONTENT_LENGTH = "1";
 
+async function validateUploadedVideo(
+  videoUrl: string,
+  pipelineId: string
+): Promise<{ url: string } | { error: string }> {
+  let url: URL;
+  try {
+    url = new URL(videoUrl);
+  } catch {
+    return { error: "Invalid video URL" };
+  }
+
+  if (url.protocol !== "https:") {
+    return { error: "Video URL must use HTTPS" };
+  }
+
+  try {
+    // `head` authenticates with BLOB_READ_WRITE_TOKEN, so it only succeeds for
+    // objects in the Blob store configured for this application.
+    const blob = await head(videoUrl);
+    if (!blob.pathname.startsWith(`${pipelineId}/input/`)) {
+      return { error: "Video URL does not belong to this pipeline" };
+    }
+
+    if (!blob.contentType.startsWith("video/")) {
+      return { error: "Uploaded file must be a video" };
+    }
+
+    return { url: blob.url };
+  } catch {
+    return { error: "Video URL must reference an uploaded video" };
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get("video") as File | null;
-    const videoUrl = formData.get("videoUrl") as string | null;
-    const videoName = formData.get("videoName") as string | null;
-    const prompt = formData.get("prompt") as string;
-    const clipCount = parseInt(formData.get("clipCount") as string) || 5;
-    const clipDuration = parseInt(formData.get("clipDuration") as string) || 12;
+    const videoUrlEntry = formData.get("videoUrl");
+    const videoUrl = typeof videoUrlEntry === "string" ? videoUrlEntry : null;
+    const videoNameEntry = formData.get("videoName");
+    const videoName = typeof videoNameEntry === "string" ? videoNameEntry : null;
+    const promptEntry = formData.get("prompt");
+    const prompt = typeof promptEntry === "string" ? promptEntry : "";
+    const clipCountEntry = formData.get("clipCount");
+    const clipCount = parseInt(typeof clipCountEntry === "string" ? clipCountEntry : "") || 5;
+    const clipDurationEntry = formData.get("clipDuration");
+    const clipDuration = parseInt(typeof clipDurationEntry === "string" ? clipDurationEntry : "") || 12;
 
     if (!file && !videoUrl) {
       return NextResponse.json(
@@ -37,7 +75,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const providedPipelineId = formData.get("pipelineId") as string | null;
+    const pipelineIdEntry = formData.get("pipelineId");
+    const providedPipelineId =
+      typeof pipelineIdEntry === "string" ? pipelineIdEntry : null;
     const pipelineId =
       providedPipelineId && providedPipelineId.trim().length > 0
         ? providedPipelineId.trim()
@@ -49,6 +89,11 @@ export async function POST(request: NextRequest) {
         { error: "Missing videoUrl from Blob upload" },
         { status: 400 }
       );
+    }
+
+    const validatedVideo = await validateUploadedVideo(videoUrl, pipelineId);
+    if ("error" in validatedVideo) {
+      return NextResponse.json({ error: validatedVideo.error }, { status: 400 });
     }
 
     const resolvedVideoName =
@@ -90,7 +135,7 @@ export async function POST(request: NextRequest) {
     console.log("Starting durable video processing workflow...");
     await start(processVideoPipeline, [{
       pipelineId,
-      videoUrl,
+      videoUrl: validatedVideo.url,
       videoName: resolvedVideoName,
       prompt,
       clipCount,
@@ -101,7 +146,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       pipelineId,
-      videoUrl,
+      videoUrl: validatedVideo.url,
       statusUrl: statusBlob.url,
       message: "Video processing workflow started",
     });

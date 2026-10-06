@@ -27,12 +27,13 @@ function getSandboxConfig(): SandboxCreateParams {
 
 async function runAndCheck(
   sandbox: Sandbox,
+  command: string,
   args: string[],
   description: string
 ): Promise<string> {
   console.log(`[Sandbox] ${description}...`);
   const cmd = await sandbox.runCommand({
-    cmd: "bash",
+    cmd: command,
     args,
     detached: true,
   });
@@ -56,6 +57,7 @@ async function ensureFfmpegInstalled(sandbox: Sandbox): Promise<void> {
   // Download static ffmpeg binary (works on any Linux)
   await runAndCheck(
     sandbox,
+    "bash",
     ["-lc", `
       set -ex
       cd /tmp
@@ -80,16 +82,19 @@ async function ensureFfmpegInstalled(sandbox: Sandbox): Promise<void> {
   );
   
   // Verify ffmpeg is available using full path
-  await runAndCheck(sandbox, ["-lc", "/usr/local/bin/ffmpeg -version"], "Verify ffmpeg");
-  await runAndCheck(sandbox, ["-lc", "/usr/local/bin/ffmpeg -filters | grep subtitles"], "Verify subtitles filter");
+  await runAndCheck(sandbox, "bash", ["-lc", "/usr/local/bin/ffmpeg -version"], "Verify ffmpeg");
+  await runAndCheck(sandbox, "bash", ["-lc", "/usr/local/bin/ffmpeg -filters | grep subtitles"], "Verify subtitles filter");
 }
 
 async function downloadVideo(sandbox: Sandbox, videoUrl: string): Promise<void> {
   await runAndCheck(
     sandbox,
-    ["-lc", `curl -L -f '${videoUrl}' -o /tmp/input.mp4 && ls -la /tmp/input.mp4`],
+    "curl",
+    ["-L", "-f", "-o", "/tmp/input.mp4", "--", videoUrl],
     "Download video"
   );
+
+  await runAndCheck(sandbox, "ls", ["-la", "/tmp/input.mp4"], "Verify downloaded video");
 }
 
 export async function extractAudioInSandbox(videoUrl: string): Promise<Buffer> {
@@ -103,12 +108,14 @@ export async function extractAudioInSandbox(videoUrl: string): Promise<Buffer> {
 
     await runAndCheck(
       sandbox,
+      "bash",
       ["-lc", "/usr/local/bin/ffmpeg -y -i /tmp/input.mp4 -vn -acodec mp3 /tmp/audio.mp3 && ls -la /tmp/audio.mp3"],
       "Extract audio"
     );
 
     const base64Audio = await runAndCheck(
       sandbox,
+      "bash",
       ["-lc", "base64 -w 0 /tmp/audio.mp3"],
       "Encode audio to base64"
     );
@@ -143,6 +150,7 @@ export async function generateClipsInSandbox(
 
       await runAndCheck(
         sandbox,
+        "bash",
         ["-lc", `echo '${clip.assBase64}' | base64 -d > ${assPath}`],
         `Write ASS file for clip ${i + 1}`
       );
@@ -162,12 +170,14 @@ export async function generateClipsInSandbox(
 
       await runAndCheck(
         sandbox,
+        "bash",
         ["-lc", `${ffmpegCmd} && ls -la ${outPath}`],
         `Generate clip ${i + 1}`
       );
 
       const clipBase64 = await runAndCheck(
         sandbox,
+        "bash",
         ["-lc", `base64 -w 0 ${outPath}`],
         `Encode clip ${i + 1} to base64`
       );
@@ -203,6 +213,7 @@ export async function generateClipInSandbox(
 
     await runAndCheck(
       sandbox,
+      "bash",
       ["-lc", `echo '${clip.assBase64}' | base64 -d > ${assPath}`],
       `Write ASS file for clip ${clipIndex + 1}`
     );
@@ -222,12 +233,14 @@ export async function generateClipInSandbox(
 
     await runAndCheck(
       sandbox,
+      "bash",
       ["-lc", `${ffmpegCmd} && ls -la ${outPath}`],
       `Generate clip ${clipIndex + 1}`
     );
 
     const clipBase64 = await runAndCheck(
       sandbox,
+      "bash",
       ["-lc", `base64 -w 0 ${outPath}`],
       `Encode clip ${clipIndex + 1} to base64`
     );
